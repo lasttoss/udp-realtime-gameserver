@@ -167,6 +167,26 @@ PY
 | GET | `/healthz` | liveness |
 | GET | `/` | the canvas viewer |
 
+## Kubernetes
+
+```bash
+helm install arena deploy/helm/udp-relay
+kubectl port-forward svc/arena-udp-relay 8080:8080
+helm test arena
+```
+
+The chart in [`deploy/helm/udp-relay`](deploy/helm/udp-relay) runs the relay with the parts a UDP
+service needs and not the parts it does not: `hostPort` so the node delivers a datagram straight to
+the pod that owns the room, `RELAY_ADVERTISE=$(POD_IP)` so a ticket names its own pod, readiness on
+`/healthz` from the process that binds the socket, no CPU limit because a throttled tick loop is
+worse than a noisy neighbour, a disruption budget, node spreading, and an optional `NodePort`
+Service, ServiceMonitor and NetworkPolicy.
+
+It was installed and upgraded on a real `kind` cluster, not only rendered, and that is where the
+rollout deadlock in [`docs/kubernetes.md`](docs/kubernetes.md) was found. The reasoning behind each
+choice, and what is still missing before this belongs on the public internet, is in
+[`docs/kubernetes.md`](docs/kubernetes.md).
+
 ## Configuration
 
 | environment | default | meaning |
@@ -221,6 +241,7 @@ honest 30 Hz client is ever clamped again.
 ```bash
 make race       # go test -race ./...
 make coverage   # prints the total coverage line
+helm lint deploy/helm/udp-relay   # the chart is part of the build
 ```
 
 - `internal/protocol`: frame round trips, short frame rejection, speed clamping (over budget,
@@ -263,6 +284,9 @@ internal/protocol  wire format, quantisation, speed clamp, ticket signing
 internal/relay     rooms, players, the 30 Hz tick, ghosts, GC, metrics
 internal/gateway   auth endpoint, stats API, Prometheus, the canvas viewer
 scripts/smoke.py   end-to-end proof over HTTP and UDP (what CI runs)
+deploy/helm/udp-relay  the Helm chart: Deployment, Service, PDB, probes, optional HPA,
+                       ServiceMonitor, NetworkPolicy, and a `helm test` that checks the API
+docs/kubernetes.md     why the chart looks like this, and what is missing for production
 ```
 
 ## Known limitations

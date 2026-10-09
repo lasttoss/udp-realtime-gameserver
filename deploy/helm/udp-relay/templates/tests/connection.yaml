@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "udp-relay.fullname" . }}-test-connection
+  labels:
+    {{- include "udp-relay.labels" . | nindent 4 }}
+  annotations:
+    # helm test: proves the gateway answers and the relay behind it reports a live tick loop.
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  securityContext:
+    {{- toYaml .Values.podSecurityContext | nindent 4 }}
+  containers:
+    - name: healthz
+      image: busybox:1.37
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          wget -qO- "http://{{ include "udp-relay.fullname" . }}:{{ .Values.http.port }}/healthz" | grep -qx ok
+          wget -qO- "http://{{ include "udp-relay.fullname" . }}:{{ .Values.http.port }}/v1/stats" | grep -q '"tick_rate":30'
+          wget -qO- "http://{{ include "udp-relay.fullname" . }}:{{ .Values.http.port }}/metrics" | grep -q '^udp_relay_packets_in_total'
+          echo "the gateway answers, the relay reports a 30 Hz tick and the metrics endpoint is live"
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          memory: 32Mi

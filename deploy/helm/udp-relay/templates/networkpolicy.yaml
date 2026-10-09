@@ -1,0 +1,27 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "udp-relay.fullname" . }}
+  labels:
+    {{- include "udp-relay.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "udp-relay.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Game traffic: UDP from anywhere by default, this port is the product.
+    - ports:
+        - port: {{ .Values.udp.port }}
+          protocol: UDP
+    # HTTP: the auth endpoint and the metrics scrape.
+    - ports:
+        - port: {{ .Values.http.port }}
+          protocol: TCP
+      {{- with .Values.networkPolicy.httpFrom }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

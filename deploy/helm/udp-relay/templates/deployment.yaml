@@ -1,0 +1,150 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "udp-relay.fullname" . }}
+  labels:
+    {{- include "udp-relay.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: {{ .Values.deploymentStrategy.maxSurge }}
+      maxUnavailable: {{ .Values.deploymentStrategy.maxUnavailable }}
+  selector:
+    matchLabels:
+      {{- include "udp-relay.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        # Roll the pods when the settings change, not only when the image does.
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "udp-relay.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: relay
+          image: {{ include "udp-relay.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: RELAY_ADDR
+              value: ":{{ .Values.udp.port }}"
+            - name: HTTP_ADDR
+              value: ":{{ .Values.http.port }}"
+            - name: RELAY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "udp-relay.secretName" . }}
+                  key: RELAY_SECRET
+            - name: MAX_ROOMS
+              value: {{ .Values.config.maxRooms | quote }}
+            - name: ROOM_IDLE_TIMEOUT
+              value: {{ .Values.config.roomIdleTimeout | quote }}
+            - name: GHOST_DROP_AFTER
+              value: {{ .Values.config.ghostDropAfter | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            {{- if or .Values.advertisePodIP .Values.extraEnv }}
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            {{- end }}
+            {{- if .Values.advertisePodIP }}
+            # A ticket has to name the pod that holds the room, so this one names itself. Behind a
+            # Service the client would be sent to a random pod whose rooms are somebody else's.
+            - name: RELAY_ADVERTISE
+              value: "$(POD_IP):{{ .Values.udp.port }}"
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            # Last, so an operator can override anything above, including the address in a ticket.
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: udp
+              containerPort: {{ .Values.udp.port }}
+              protocol: UDP
+              {{- if .Values.udp.hostPort.enabled }}
+              hostPort: {{ .Values.udp.hostPort.port | default .Values.udp.port }}
+              {{- end }}
+            - name: http
+              containerPort: {{ .Values.http.port }}
+              protocol: TCP
+              {{- if .Values.http.hostPort.enabled }}
+              hostPort: {{ .Values.http.hostPort.port | default .Values.http.port }}
+              {{- end }}
+          # The gateway answers /healthz from the same process as the relay, so a Ready pod is a
+          # pod whose UDP socket is bound and whose tick loop is running.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              # Give kube-proxy and the cloud load balancer time to stop sending new players here
+              # before the relay starts refusing them, so a rolling update does not drop a room.
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- if .Values.topologySpreadConstraints.enabled }}
+      topologySpreadConstraints:
+        - maxSkew: {{ .Values.topologySpreadConstraints.maxSkew }}
+          topologyKey: {{ .Values.topologySpreadConstraints.topologyKey }}
+          whenUnsatisfiable: {{ .Values.topologySpreadConstraints.whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              {{- include "udp-relay.selectorLabels" . | nindent 14 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

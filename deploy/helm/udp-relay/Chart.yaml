@@ -1,0 +1,18 @@
+apiVersion: v2
+name: udp-relay
+description: The 30 Hz UDP realtime game server from this repository - a relay that owns the simulation, with the HTTP gateway that mints the join tickets next to it in the same process.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+home: https://github.com/lasttoss/udp-realtime-gameserver
+sources:
+  - https://github.com/lasttoss/udp-realtime-gameserver
+keywords:
+  - game-server
+  - udp
+  - realtime
+  - netcode
+maintainers:
+  - name: dungtt
+annotations:
+  category: GameServer

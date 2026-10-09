@@ -1,0 +1,141 @@
+# Every knob the relay reads from the environment is exposed here, plus the Kubernetes side:
+# probes, a disruption budget, a spread constraint and the security context.
+
+# One pod per node while udp.hostPort is on: a node can only bind one socket per port. Raise this
+# to your node count, or switch to the UDP Service below to pack more pods per node.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/lasttoss/udp-realtime-gameserver
+  # Defaults to the chart's appVersion when left empty, which keeps the two from drifting apart.
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+# The relay and the gateway share one process, so one container serves both the UDP game traffic
+# and the HTTP API the clients authenticate against.
+udp:
+  port: 9000
+  # hostPort is what makes a room reachable on a plain cluster: every node forwards this UDP port
+  # to its local pod, so a client that was told "talk to 10.244.3.7:9000" gets there. Set
+  # service.udp.type=NodePort below for the managed-cloud alternative and turn this off.
+  hostPort:
+    enabled: true
+http:
+  port: 8080
+  # Off by default: in a real install the gateway sits behind an Ingress or a NodePort Service.
+  # Turn it on to reach the API straight through a node, which is what a single-node demo wants.
+  hostPort:
+    enabled: false
+    port: null
+
+service:
+  type: ClusterIP
+  annotations: {}
+  # A UDP Service in front of the relay only works with sessionAffinity: ClientIP, because a
+  # client's packets have to keep landing on the pod that holds its room.
+  udp:
+    enabled: false
+    type: NodePort
+    nodePort: null
+    sessionAffinity: ClientIP
+
+# The relay holds rooms in memory, so a restart drops the players in them. One pod at a time,
+# and the pod that goes away gets its full grace period to tell its players.
+#
+# maxUnavailable: 0 is the safe setting on a cluster with a spare node, and it DEADLOCKS a single
+# node cluster while udp.hostPort is on: the new pod cannot bind the UDP port the old pod still
+# holds, and the old pod is not stopped while the new one is not Ready. Set it to 1 (or
+# replicaCount to 0 on a node you are draining) when there is only one node to schedule on.
+deploymentStrategy:
+  maxSurge: 1
+  maxUnavailable: 0
+terminationGracePeriodSeconds: 20
+
+# Leave empty to have the chart generate one from the release name, or point at a Secret you
+# manage yourself (recommended in production: the secret signs every join ticket).
+secret:
+  create: true
+  existingSecret: ""
+  value: ""
+  annotations: {}
+
+# Tuning the chart passes straight through to the relay's own environment.
+config:
+  maxRooms: 1000
+  roomIdleTimeout: 30s
+  ghostDropAfter: 5s
+  logLevel: info
+
+# Point clients at the pod they were told about: the gateway returns this address when it mints
+# a ticket, so each pod advertises itself rather than a Service in front of all of them.
+advertisePodIP: true
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 128Mi
+  limits:
+    # No CPU limit on purpose: the relay is a latency service, and a throttled tick loop is worse
+    # than a noisy neighbour. Cap memory, let CPU burst.
+    memory: 512Mi
+
+# Tick budget, not CPU, is what actually saturates this service; a request-heavy autoscaler would
+# add pods that get no players. Enabled here for completeness, documented as a blunt instrument.
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 75
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Spread pods over nodes: two relay pods on one node share its network stack and its CPU.
+topologySpreadConstraints:
+  enabled: true
+  maxSkew: 1
+  topologyKey: kubernetes.io/hostname
+  whenUnsatisfiable: ScheduleAnyway
+
+prometheus:
+  serviceMonitor:
+    enabled: false
+    interval: 15s
+    labels: {}
+
+networkPolicy:
+  enabled: false
+  # Empty means "from anywhere"; the UDP port is usually exposed to the internet.
+  httpFrom: []
+
+# Anything else the relay learns from the environment. The obvious use is pinning the address
+# clients are told to connect to, e.g. RELAY_ADVERTISE=relay.example.com:9000 behind a proxy.
+extraEnv: []
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  # The image runs as the unprivileged "app" user (10001) it creates for itself; override this if
+  # you build your own image with a different uid.
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL

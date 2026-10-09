@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "udp-relay.fullname" . }}
+  labels:
+    {{- include "udp-relay.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "udp-relay.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.http.port }}
+      targetPort: http
+      protocol: TCP
+{{- if .Values.service.udp.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "udp-relay.fullname" . }}-udp
+  labels:
+    {{- include "udp-relay.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.udp.type }}
+  # A UDP Service is a DNAT rule per packet: without ClientIP affinity the inputs of one player
+  # can land on different pods, and only one of them has the room.
+  sessionAffinity: {{ .Values.service.udp.sessionAffinity }}
+  selector:
+    {{- include "udp-relay.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: udp
+      port: {{ .Values.udp.port }}
+      targetPort: udp
+      protocol: UDP
+      {{- with .Values.service.udp.nodePort }}
+      nodePort: {{ . }}
+      {{- end }}
+{{- end }}

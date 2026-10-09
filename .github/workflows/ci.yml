@@ -38,3 +38,34 @@ jobs:
       - name: Logs
         if: always()
         run: docker compose logs relay
+
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+      - name: Lint the chart
+        run: helm lint deploy/helm/udp-relay
+      - name: Render the defaults and every optional feature
+        run: |
+          helm template arena deploy/helm/udp-relay > /tmp/default.yaml
+          helm template arena deploy/helm/udp-relay \
+            --set autoscaling.enabled=true \
+            --set prometheus.serviceMonitor.enabled=true \
+            --set networkPolicy.enabled=true \
+            --set service.udp.enabled=true \
+            --set http.hostPort.enabled=true \
+            --set secret.existingSecret=byo-secret \
+            --set advertisePodIP=false \
+            --set extraEnv[0].name=RELAY_ADVERTISE \
+            --set extraEnv[0].value=relay.example.com:9000 > /tmp/full.yaml
+          # A duplicated env name or a container port without a name is the kind of thing a render
+          # hides and a cluster refuses, so the render is checked for both.
+          ! grep -c 'name: RELAY_ADVERTISE' /tmp/default.yaml | grep -qx 0
+      - name: Validate the rendered objects against the Kubernetes schemas
+        run: |
+          curl -sSLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform.tar.gz kubeconform
+          ./kubeconform -strict -summary -ignore-missing-schemas /tmp/default.yaml /tmp/full.yaml

@@ -1,0 +1,32 @@
+{{ .Chart.Name }} {{ .Chart.Version }} - a 30 Hz UDP relay with its HTTP gateway (app {{ .Chart.AppVersion }}).
+
+Pods: {{ if .Values.autoscaling.enabled }}autoscaled from {{ .Values.autoscaling.minReplicas }} to {{ .Values.autoscaling.maxReplicas }}{{ else }}{{ .Values.replicaCount }}{{ end }}
+UDP:  {{ .Values.udp.port }}/udp {{ if .Values.udp.hostPort.enabled }}(hostPort on every node){{ else }}via the {{ .Values.service.udp.type }} Service{{ end }}
+HTTP: {{ .Values.http.port }}/tcp (ClusterIP, the ticket endpoint and /metrics)
+
+{{- if and .Values.udp.hostPort.enabled (lt (int .Values.replicaCount) 2) }}
+Heads up: udp.hostPort is on and this release runs one pod, so a rolling update cannot overlap -
+set deploymentStrategy.maxUnavailable=1 or the next upgrade will wait forever for a port the old
+pod is still holding.
+{{- end }}
+
+Each pod advertises its own IP in the tickets it mints, so a client is always sent to the pod that
+holds its room. That also means a client that reconnects after a rollout gets a new room.
+
+Try it from your laptop:
+
+  # the HTTP API, through a port forward
+  kubectl port-forward svc/{{ include "udp-relay.fullname" . }} {{ .Values.http.port }}:{{ .Values.http.port }}
+  curl -s localhost:{{ .Values.http.port }}/v1/stats
+
+{{- if .Values.udp.hostPort.enabled }}
+  # game traffic goes straight to a node, no port forward needed
+  python3 scripts/smoke.py <node-ip> {{ .Values.http.port }} <node-ip> {{ .Values.udp.port }}
+{{- else }}
+  # game traffic through the UDP Service: keep the client on one pod with sessionAffinity ClientIP
+  kubectl get svc {{ include "udp-relay.fullname" . }}-udp
+{{- end }}
+
+Run the chart's own checks with:
+
+  helm test {{ .Release.Name }}
