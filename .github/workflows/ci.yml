@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: gofmt -l . | tee /dev/stderr | wc -l | grep -qx 0
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test -race -coverprofile=coverage.out ./...
+      - run: go tool cover -func=coverage.out | tail -1
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Start the relay container
+        run: docker compose up -d --build
+      - name: Smoke test over HTTP and UDP
+        run: python3 scripts/smoke.py 127.0.0.1 8080 127.0.0.1 9000
+      - name: A short load test
+        run: go run ./cmd/botswarm -gateway http://127.0.0.1:8080 -relay 127.0.0.1:9000 -ccu 100 -ramp 3s -duration 5s
+      - name: Logs
+        if: always()
+        run: docker compose logs relay

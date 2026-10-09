@@ -1,0 +1,17 @@
+services:
+  relay:
+    build: .
+    container_name: udp-relay
+    environment:
+      RELAY_ADDR: ":9000"
+      HTTP_ADDR: ":8080"
+      RELAY_SECRET: ${RELAY_SECRET:-dev-secret-change-me}
+      # what clients are told to connect to: the host, from outside the container
+      RELAY_ADVERTISE: ${RELAY_ADVERTISE:-127.0.0.1:9000}
+      MAX_ROOMS: ${MAX_ROOMS:-1000}
+      ROOM_IDLE_TIMEOUT: ${ROOM_IDLE_TIMEOUT:-30s}
+      GHOST_DROP_AFTER: ${GHOST_DROP_AFTER:-5s}
+    ports:
+      - "${HTTP_PORT:-8080}:8080/tcp"
+      - "${RELAY_PORT:-9000}:9000/udp"
+    restart: unless-stopped

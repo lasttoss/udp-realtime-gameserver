@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>udp relay - live rooms</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0d1117; color: #c9d1d9; font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  header { padding: 14px 18px; border-bottom: 1px solid #21262d; display: flex; gap: 24px; flex-wrap: wrap; align-items: baseline; }
+  h1 { font-size: 15px; margin: 0; color: #58a6ff; font-weight: 600; }
+  .kv { color: #8b949e; } .kv b { color: #c9d1d9; font-weight: 600; }
+  main { display: flex; gap: 24px; padding: 18px; flex-wrap: wrap; }
+  canvas { background: #161b22; border: 1px solid #21262d; border-radius: 8px; }
+  table { border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 4px 10px; text-align: left; border-bottom: 1px solid #21262d; }
+  th { color: #8b949e; font-weight: 500; }
+  .ghost { color: #8b949e; }
+</style>
+</head>
+<body>
+<header>
+  <h1>udp relay</h1>
+  <span class="kv">room <b id="room">-</b></span>
+  <span class="kv">region <b id="region">-</b></span>
+  <span class="kv">tick <b id="tick">0</b> @ 30 Hz</span>
+  <span class="kv">players <b id="players">0</b></span>
+  <span class="kv">snapshots drawn <b id="frames">0</b></span>
+</header>
+<main>
+  <canvas id="world" width="520" height="520"></canvas>
+  <div>
+    <table>
+      <thead><tr><th>player</th><th>x</th><th>y</th><th>idle</th><th>clamped</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p class="kv" style="max-width:420px">
+      Positions come from <code>/v1/rooms/{id}/state</code>, i.e. from the authoritative rooms the
+      relay is simulating - not from the clients. Ghost rows are players whose input stopped
+      arriving: the relay keeps publishing their last known position so peers can keep
+      interpolating until they time out.
+    </p>
+  </div>
+</main>
+<script>
+const WORLD_CM = 15000;         // half of the arena, in centimetres
+const canvas = document.getElementById('world');
+const ctx = canvas.getContext('2d');
+const scale = canvas.width / (WORLD_CM * 2);
+let roomId = null, frames = 0;
+
+const el = (id) => document.getElementById(id);
+
+function toCanvas(cm) { return canvas.width / 2 + cm * scale; }
+
+async function pickRoom() {
+  const res = await fetch('/v1/rooms');
+  const { rooms = [] } = await res.json();
+  if (!rooms.length) return null;
+  roomId = rooms[0].id;
+  return roomId;
+}
+
+function draw(state) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#21262d';
+  for (let i = 0; i <= 10; i++) {
+    const p = (canvas.width / 10) * i;
+    ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, canvas.height); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(canvas.width, p); ctx.stroke();
+  }
+
+  const players = state.players || [];
+  for (const p of players) {
+    ctx.beginPath();
+    ctx.arc(toCanvas(p.x), toCanvas(p.y), 9, 0, Math.PI * 2);
+    ctx.fillStyle = p.ghost ? '#484f58' : (p.violations > 0 ? '#f0883e' : '#3fb950');
+    ctx.fill();
+    ctx.fillStyle = '#0d1117';
+    ctx.font = '10px ui-monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(String(p.id), toCanvas(p.x), toCanvas(p.y) + 3);
+  }
+
+  el('players').textContent = players.length;
+  el('rows').innerHTML = players.map((p) => `<tr class="${p.ghost ? 'ghost' : ''}">
+      <td>${p.id}</td><td>${p.x}</td><td>${p.y}</td><td>${p.idle_ms} ms</td><td>${p.violations}</td>
+    </tr>`).join('');
+}
+
+async function loop() {
+  try {
+    if (roomId === null && (await pickRoom()) === null) {
+      el('room').textContent = 'none yet - start a bot: make load';
+      setTimeout(loop, 1000);
+      return;
+    }
+    const res = await fetch(`/v1/rooms/${roomId}/state`);
+    if (res.ok) {
+      const state = await res.json();
+      frames++;
+      el('room').textContent = state.id;
+      el('region').textContent = state.region;
+      el('tick').textContent = state.tick;
+      el('frames').textContent = frames;
+      draw(state);
+    } else {
+      roomId = null; // the room was collected: pick another one
+    }
+  } catch (err) {
+    el('room').textContent = 'gateway unreachable';
+  }
+  setTimeout(loop, 100);
+}
+
+loop();
+</script>
+</body>
+</html>
