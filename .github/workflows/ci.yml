@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -22,6 +23,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     needs: build
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +32,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Start the relay container
-        run: docker compose up -d --build
+        run: docker compose up -d --build --wait --wait-timeout 240
       - name: Smoke test over HTTP and UDP
         run: python3 scripts/smoke.py 127.0.0.1 8080 127.0.0.1 9000
       - name: A short load test
@@ -41,6 +43,7 @@ jobs:
 
   helm:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
@@ -69,3 +72,7 @@ jobs:
           curl -sSLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
           tar xf kubeconform.tar.gz kubeconform
           ./kubeconform -strict -summary -ignore-missing-schemas /tmp/default.yaml /tmp/full.yaml
+
+      - name: What is running
+        if: always()
+        run: docker compose ps
