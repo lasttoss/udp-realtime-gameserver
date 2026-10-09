@@ -306,3 +306,19 @@ docs/kubernetes.md     why the chart looks like this, and what is missing for pr
 ## License
 
 MIT - see [LICENSE](LICENSE). No third-party dependencies: this is the Go standard library.
+
+## One tick, end to end
+
+The Mermaid block above is the wiring. `docs/diagrams/tick-roundtrip.html` is the same path drawn to
+explain the two things a UDP server cannot avoid — a packet that never arrives, and a client that has
+already moved past it — with the measured percentiles of a real run on the same picture: 449,868 snapshots
+at 30.0 per client per second, rtt p50/p99 of 108 µs and 17.4 ms, and a tick loop spending 19.7 ms of its
+33.3 ms budget at the 99th percentile.
+
+Both sources are in the repository — self-contained HTML with inline SVG, and
+`docs/diagrams/tick-roundtrip.mmd` for the places that render Markdown — because a source can be reviewed
+and diffed, and the PNG is a build artifact:
+
+```bash
+make diagram   # exports a PNG using a local chromium, if there is one
+```

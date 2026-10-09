@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>One tick, end to end — a 30 Hz UDP game server</title>
+<style>
+  :root { --ink:#151412; --paper:#f7f4ee; --rule:#cfc7b8; --red:#b3261e; --green:#1a6b3c; --amber:#8a5a00; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink);
+         font:16px/1.5 "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; }
+  .sheet { max-width:1080px; margin:0 auto; padding:56px 40px 72px; }
+  .kicker { font:600 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing:.14em;
+            text-transform:uppercase; color:var(--amber); }
+  h1 { font-size:38px; line-height:1.15; margin:.35em 0 .2em; letter-spacing:-.01em; }
+  .dek { font-size:19px; color:#463f36; max-width:76ch; margin:0 0 8px; }
+  .meta { font:12px/1.6 ui-monospace, Menlo, monospace; color:#6b6357; border-top:1px solid var(--rule);
+          padding-top:10px; margin-top:22px; }
+  svg { display:block; width:100%; height:auto; margin:34px 0 0; }
+  .pairs { display:grid; grid-template-columns:1fr 1fr; gap:26px; margin-top:34px; }
+  .card { border-left:4px solid var(--ink); padding:14px 0 14px 18px; background:#fffdf8; }
+  .card b { display:block; font-size:12px; letter-spacing:.12em; text-transform:uppercase; margin-bottom:6px; }
+  .card p { margin:0; font-size:17px; } .card p + p { margin-top:7px; }
+  footer { margin-top:38px; font:12px/1.7 ui-monospace, Menlo, monospace; color:#6b6357;
+           border-top:1px solid var(--rule); padding-top:12px; }
+  text { font-family:"Iowan Old Style", Palatino, Georgia, serif; }
+  .mono { font-family:ui-monospace, Menlo, monospace; }
+</style>
+<div class="sheet">
+  <div class="kicker">Runtime · udp-realtime-gameserver</div>
+  <h1>One tick, end to end</h1>
+  <p class="dek">Input arrives as a 7-byte datagram, the room is simulated on a fixed 30 Hz tick, and a
+    snapshot of 74 bytes goes back out. Everything interesting is in the two things a UDP server cannot
+    avoid: a packet that never arrives, and a client that has already moved on.</p>
+  <div class="meta">measured with <span class="mono">cmd/botswarm</span> on one machine · tick budget
+    33.3 ms · snapshot 74 B for a ten-player room</div>
+
+  <svg viewBox="0 0 1040 560" role="img" aria-label="Input from a thousand simulated clients reaches the gateway, the relay simulates on a 30 Hz tick and broadcasts snapshots, and a viewer reads room state over HTTP">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#151412"/></marker>
+      <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#1a6b3c"/></marker>
+      <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0 0 L10 5 L0 10 z" fill="#b3261e"/></marker>
+    </defs>
+
+    <!-- four columns -->
+    <rect x="30" y="46" width="200" height="132" rx="4" fill="#fffdf8" stroke="#151412" stroke-width="2"/>
+    <text x="46" y="72" font-size="15" font-weight="600">botswarm</text>
+    <text x="46" y="94" font-size="12" class="mono">1000 clients</text>
+    <text x="46" y="112" font-size="12" class="mono">auth, then UDP</text>
+    <text x="46" y="130" font-size="12" class="mono">measures rtt</text>
+    <text x="46" y="148" font-size="12" class="mono">and packet rate</text>
+    <text x="46" y="168" font-size="12" fill="#6b6357">the load generator</text>
+
+    <rect x="290" y="46" width="200" height="132" rx="4" fill="#fffdf8" stroke="#151412" stroke-width="2"/>
+    <text x="306" y="72" font-size="15" font-weight="600">gateway</text>
+    <text x="306" y="94" font-size="12" class="mono">UDP socket</text>
+    <text x="306" y="112" font-size="12" class="mono">opcode decode</text>
+    <text x="306" y="130" font-size="12" class="mono">rooms by region</text>
+    <text x="306" y="148" font-size="12" class="mono">one writer per room</text>
+    <text x="306" y="168" font-size="12" fill="#6b6357">never blocks on a room</text>
+
+    <rect x="550" y="46" width="200" height="132" rx="4" fill="#eef5ef" stroke="#1a6b3c" stroke-width="2"/>
+    <text x="566" y="72" font-size="15" font-weight="600">relay</text>
+    <text x="566" y="94" font-size="12" class="mono">fixed 30 Hz tick</text>
+    <text x="566" y="112" font-size="12" class="mono">quantise to int16</text>
+    <text x="566" y="130" font-size="12" class="mono">AckSeq per player</text>
+    <text x="566" y="148" font-size="12" class="mono">33.3 ms budget</text>
+    <text x="566" y="168" font-size="12" fill="#1a6b3c">the whole game loop</text>
+
+    <rect x="810" y="46" width="200" height="132" rx="4" fill="#f2efe9" stroke="#6b6357" stroke-dasharray="6 5"/>
+    <text x="826" y="72" font-size="15" font-weight="600">viewer</text>
+    <text x="826" y="94" font-size="12" class="mono">canvas, HTTP</text>
+    <text x="826" y="112" font-size="12" class="mono">GET room state</text>
+    <text x="826" y="130" font-size="12" class="mono">reads the same</text>
+    <text x="826" y="148" font-size="12" class="mono">room the players do</text>
+    <text x="826" y="168" font-size="12" fill="#6b6357">not in the hot path</text>
+
+    <path d="M230 100 L290 100" stroke="#151412" stroke-width="2" marker-end="url(#a)"/>
+    <text x="234" y="90" font-size="11" class="mono" fill="#6b6357">INPUT 7B</text>
+    <path d="M490 100 L550 100" stroke="#151412" stroke-width="2" marker-end="url(#a)"/>
+    <text x="494" y="90" font-size="11" class="mono" fill="#6b6357">input queue</text>
+    <path d="M750 100 L810 100" stroke="#151412" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#a)"/>
+    <text x="754" y="90" font-size="11" class="mono" fill="#6b6357">room state</text>
+
+    <!-- the return path -->
+    <path d="M550 200 L550 226 L130 226 L130 178" stroke="#1a6b3c" stroke-width="2" marker-end="url(#ag)"/>
+    <text x="188" y="220" font-size="12" class="mono" fill="#1a6b3c">SNAPSHOT 74B · 30 Hz to every player in the room</text>
+
+    <!-- the two hard parts -->
+    <rect x="30" y="256" width="480" height="126" rx="4" fill="#fdeeed" stroke="#b3261e"/>
+    <text x="46" y="282" font-size="14" font-weight="600" fill="#b3261e">A packet that never arrives</text>
+    <text x="46" y="306" font-size="13">UDP loses packets and the server does not resend them.</text>
+    <text x="46" y="326" font-size="13">Peers keep interpolating the last known position, so</text>
+    <text x="46" y="346" font-size="13">the player keeps moving instead of freezing; if the</text>
+    <text x="46" y="366" font-size="13">silence lasts, the player is dropped from the room.</text>
+
+    <rect x="530" y="256" width="480" height="126" rx="4" fill="#eef5ef" stroke="#1a6b3c"/>
+    <text x="546" y="282" font-size="14" font-weight="600" fill="#1a6b3c">A client that has already moved</text>
+    <text x="546" y="306" font-size="13">Every snapshot carries the sequence number the</text>
+    <text x="546" y="326" font-size="13">server has applied. The client replays the inputs</text>
+    <text x="546" y="346" font-size="13">after it, and the snapshot is the truth: prediction</text>
+    <text x="546" y="366" font-size="13">that cannot be corrected is just a different bug.</text>
+
+    <!-- measurements -->
+    <rect x="30" y="404" width="980" height="126" rx="4" fill="#fffdf8" stroke="#cfc7b8"/>
+    <text x="46" y="428" font-size="12" class="mono" fill="#6b6357">MEASURED, ONE MACHINE, cmd/botswarm</text>
+    <text x="46" y="456" font-size="14" class="mono">snapshots received  <tspan fill="#1a6b3c">449,868</tspan> · <tspan fill="#1a6b3c">30.0</tspan> per client per second</text>
+    <text x="46" y="480" font-size="14" class="mono">rtt p50 / p95 / p99  <tspan fill="#1a6b3c">108 µs / 13.5 ms / 17.4 ms</tspan>  (14,000 samples)</text>
+    <text x="46" y="504" font-size="14" class="mono">tick loop p50 / p95 / p99  <tspan fill="#1a6b3c">5.0 / 18.0 / 19.7 ms</tspan>  of a 33.3 ms budget</text>
+    <text x="46" y="524" font-size="13" class="mono" fill="#6b6357">bandwidth: 74 B snapshot · ~1.3 MiB/s for 1000 players at 30 Hz</text>
+  </svg>
+
+  <div class="pairs">
+    <div class="card">
+      <b>The honest part</b>
+      <p>These are numbers from one machine and one run, not a capacity claim. The useful comparison is the
+        tick percentiles against the budget: p99 at 19.7 ms of 33.3 ms means the loop has room, and p50 at
+        5.0 ms means the room is mostly waiting for the clock.</p>
+    </div>
+    <div class="card">
+      <b>Why quantise positions</b>
+      <p>An <span class="mono">int16</span> centimetre is 74 bytes where a float pair would be more, and at
+        30 Hz broadcast to every player in a room that difference is the bandwidth budget. The precision is a
+        decision: centimetres, not millimetres.</p>
+    </div>
+  </div>
+
+  <footer>
+    Sources: docs/diagrams/tick-roundtrip.mmd for the Mermaid version, the protocol table in README.md for
+    opcodes and sizes, internal/protocol for the codec. The viewer is drawn dashed because it reads state
+    over HTTP and is not in the path a player's packet takes.
+  </footer>
+</div>
+</html>
