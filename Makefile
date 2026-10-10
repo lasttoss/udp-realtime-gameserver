@@ -59,3 +59,34 @@ clean: ## Remove build output
 diagram:
 	@if command -v chromium >/dev/null 2>&1; then B=chromium; elif command -v google-chrome >/dev/null 2>&1; then B=google-chrome; else echo "no chromium on PATH: open docs/diagrams/*.html in a browser"; exit 0; fi; \
 	for f in docs/diagrams/*.html; do $$B --headless --screenshot="$${f%.html}.png" --window-size=1200,1000 "$$f" && echo "wrote $${f%.html}.png"; done
+
+# The chart is the deployable unit here, so it gets the same gate the app gets: strict lint,
+# a render of both branches (defaults, and every optional feature on), and schema validation.
+# CI runs the wider version of this job, including a render-time negative check; this target is
+# the one a person runs before pushing. kubeconform is fetched into .cache/ on first use.
+KUBECONFORM_VERSION = v0.6.7
+KUBECONFORM = .cache/kubeconform
+
+chart: ## Lint the chart, render every branch, validate the objects
+	@helm lint --strict deploy/helm/udp-relay
+	@mkdir -p /tmp/udp-chart && \
+	  helm template arena deploy/helm/udp-relay > /tmp/udp-chart/default.yaml && \
+	  helm template arena deploy/helm/udp-relay \
+	    --set autoscaling.enabled=true \
+	    --set prometheus.serviceMonitor.enabled=true \
+	    --set networkPolicy.enabled=true \
+	    --set service.udp.enabled=true \
+	    --set http.hostPort.enabled=true \
+	    --set secret.existingSecret=byo-secret \
+	    --set advertisePodIP=false > /tmp/udp-chart/full.yaml
+	@python3 scripts/check-render.py --expect-extra RELAY_ADVERTISE /tmp/udp-chart/full.yaml /tmp/udp-chart/default.yaml
+	@if [ ! -x "$(KUBECONFORM)" ]; then \
+	  echo "  fetching kubeconform $(KUBECONFORM_VERSION) into .cache/"; \
+	  mkdir -p .cache && curl -sSLo .cache/kubeconform.tar.gz \
+	    https://github.com/yannh/kubeconform/releases/download/$(KUBECONFORM_VERSION)/kubeconform-linux-amd64.tar.gz && \
+	  tar -xzf .cache/kubeconform.tar.gz -C .cache kubeconform && chmod +x "$(KUBECONFORM)"; fi
+	@for f in /tmp/udp-chart/default.yaml /tmp/udp-chart/full.yaml; do \
+	  echo "  validating $$f"; \
+	  "$(KUBECONFORM)" -strict -summary -ignore-missing-schemas -kubernetes-version 1.30.0 - < "$$f"; \
+	done
+.PHONY: chart

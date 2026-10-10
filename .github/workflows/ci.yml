@@ -68,8 +68,10 @@ jobs:
             --set extraEnv[0].name=RELAY_ADVERTISE \
             --set extraEnv[0].value=relay.example.com:9000 > /tmp/full.yaml
           # A duplicated env name or a container port without a name is the kind of thing a render
-          # hides and a cluster refuses, so the render is checked for both.
-          ! grep -c 'name: RELAY_ADVERTISE' /tmp/default.yaml | grep -qx 0
+          # hides and a cluster refuses, so the render is checked for both - on the rendered YAML,
+          # by the same script `make chart` runs locally, so the two cannot drift apart.
+          pip install --quiet pyyaml
+          python3 scripts/check-render.py --expect-extra RELAY_ADVERTISE /tmp/full.yaml /tmp/default.yaml
       - name: Validate the rendered objects against the Kubernetes schemas
         run: |
           curl -sSLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
