@@ -1,9 +1,0 @@
-%% Source for docs/diagrams/tick-roundtrip.html
-%% One tick, end to end: input in, snapshot out, and the two things that are easy to get wrong in between.
-flowchart LR
-  B["botswarm<br/>1000 simulated clients"] -->|"INPUT 7B · 30 Hz"| G["gateway<br/>UDP socket · opcodes"]
-  G --> R["relay<br/>fixed 30 Hz tick<br/>quantise int16 · AckSeq"]
-  R -->|"SNAPSHOT 74B (10 players)"| B
-  V["canvas viewer<br/>GET /v1/rooms/:id/state"] -.->|"not in the hot path"| G
-  L["a packet is lost"] -.-> R
-  R -.->|"peers keep interpolating<br/>the last known position"| V

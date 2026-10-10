@@ -1,7 +1,8 @@
+<!-- diagram-meta {"topic": "tick-roundtrip", "level": "runtime", "type": "runtime", "question": "One tick, end to end — a 30 Hz UDP game server", "sources": ["internal/relay/*.go", "internal/protocol/*.go", "internal/gateway/*.go", "cmd/botswarm/*.go"], "updated": "2026-10-09"} -->
 <!doctype html>
 <html lang="en">
 <meta charset="utf-8">
-<title>One tick, end to end — a 30 Hz UDP game server</title>
+
 <style>
   :root { --ink:#151412; --paper:#f7f4ee; --rule:#cfc7b8; --red:#b3261e; --green:#1a6b3c; --amber:#8a5a00; }
   * { box-sizing:border-box; }
@@ -33,9 +34,9 @@
   <div class="meta">measured with <span class="mono">cmd/botswarm</span> on one machine · tick budget
     33.3 ms · snapshot 74 B for a ten-player room</div>
 
-  <svg viewBox="0 0 1040 560" role="img" aria-label="Input from a thousand simulated clients reaches the gateway, the relay simulates on a 30 Hz tick and broadcasts snapshots, and a viewer reads room state over HTTP">
-    <defs>
-      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <svg viewBox="0 0 1040 560" role="img" aria-label="Input from<svg viewBox="0 0 1040 560" role="img" aria-labelledby="tick-roundtrip-title tick-roundtrip-desc">
+        <title id="tick-roundtrip-title">One tick, end to end — a 30 Hz UDP game server</title>
+        <desc id="tick-roundtrip-desc">Input from a thousand simulated clients reaches the gateway, the relay simulates on a 30 Hz tick and broadcasts snapshots, and a viewer reads room state over HTTP</desc> refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
         <path d="M0 0 L10 5 L0 10 z" fill="#151412"/></marker>
       <marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
         <path d="M0 0 L10 5 L0 10 z" fill="#1a6b3c"/></marker>
