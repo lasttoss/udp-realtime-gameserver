@@ -52,36 +52,10 @@ jobs:
       - uses: azure/setup-helm@v4
         with:
           version: v3.16.3
-      - name: Lint the chart
-        run: helm lint deploy/helm/udp-relay
-      - name: Render the defaults and every optional feature
-        run: |
-          helm template arena deploy/helm/udp-relay > /tmp/default.yaml
-          helm template arena deploy/helm/udp-relay \
-            --set autoscaling.enabled=true \
-            --set prometheus.serviceMonitor.enabled=true \
-            --set networkPolicy.enabled=true \
-            --set service.udp.enabled=true \
-            --set http.hostPort.enabled=true \
-            --set secret.existingSecret=byo-secret \
-            --set advertisePodIP=false \
-            --set extraEnv[0].name=RELAY_ADVERTISE \
-            --set extraEnv[0].value=relay.example.com:9000 > /tmp/full.yaml
-          # A duplicated env name or a container port without a name is the kind of thing a render
-          # hides and a cluster refuses, so the render is checked for both - on the rendered YAML,
-          # by the same script `make chart` runs locally, so the two cannot drift apart.
-          pip install --quiet pyyaml
-          python3 scripts/check-render.py --expect-extra RELAY_ADVERTISE /tmp/full.yaml /tmp/default.yaml
-      - name: Validate the rendered objects against the Kubernetes schemas
-        run: |
-          curl -sSLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
-          tar xf kubeconform.tar.gz kubeconform
-          ./kubeconform -strict -summary -ignore-missing-schemas /tmp/default.yaml /tmp/full.yaml
-
-      - name: What is running
-        if: always()
-        run: docker compose ps
-
+      # The Makefile owns this job: strict lint, both branches rendered, the render assertions,
+      # and schema validation. CI calling the same target is what keeps the two from drifting.
+      - name: Lint, render, assert, validate (make chart)
+        run: make chart
 
   image:
     # Only a push publishes. A pull request from a fork cannot write to the registry anyway, and a

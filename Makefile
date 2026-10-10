@@ -78,8 +78,12 @@ chart: ## Lint the chart, render every branch, validate the objects
 	    --set service.udp.enabled=true \
 	    --set http.hostPort.enabled=true \
 	    --set secret.existingSecret=byo-secret \
-	    --set advertisePodIP=false > /tmp/udp-chart/full.yaml
-	@python3 scripts/check-render.py --expect-extra RELAY_ADVERTISE /tmp/udp-chart/full.yaml /tmp/udp-chart/default.yaml
+	    --set advertisePodIP=false \
+	    --set extraEnv[0].name=RELAY_ADVERTISE \
+	    --set extraEnv[0].value=one.example.com:9000 \
+	    --set extraEnv[1].name=RELAY_ADVERTISE \
+	    --set extraEnv[1].value=two.example.com:9000 > /tmp/udp-chart/full.yaml
+	@python3 scripts/check-render.py --expect-count RELAY_ADVERTISE=2 /tmp/udp-chart/full.yaml /tmp/udp-chart/default.yaml
 	@if [ ! -x "$(KUBECONFORM)" ]; then \
 	  echo "  fetching kubeconform $(KUBECONFORM_VERSION) into .cache/"; \
 	  mkdir -p .cache && curl -sSLo .cache/kubeconform.tar.gz \

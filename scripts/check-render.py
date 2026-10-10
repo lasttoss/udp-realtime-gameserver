@@ -46,8 +46,9 @@ def count_env(name, path):
 def main():
     argv = sys.argv[1:]
     expect = None
-    if argv[:1] == ["--expect-extra"]:
-        expect, argv = argv[1], argv[2:]
+    if argv[:1] == ["--expect-count"]:
+        spec, argv = argv[1], argv[2:]
+        expect = tuple(spec.split("=", 1))
     paths = argv
     if not paths:
         print("usage: check-render.py <rendered.yaml> [...]", file=sys.stderr)
@@ -73,14 +74,14 @@ def main():
             elif n > 1:
                 failures.append(f"{path}: env {name} appears {n} times")
     if expect:
-        name, full, default = expect, paths[0], paths[1]
-        got, base = count_env(name, full), count_env(name, default)
-        if got != base + 1:
+        name, want = expect[0], int(expect[1])
+        got = count_env(name, paths[0])
+        if got != want:
             failures.append(
-                f"{full}: env {name} appears {got} times but {base} + 1 was expected, so the "
-                f"render is hiding the duplicate the values asked for")
+                f"{paths[0]}: env {name} appears {got} times, expected {want} - the render is either "
+                f"hiding entries the values ask for, or inventing ones they do not")
         else:
-            print(f"  {name}: {base} in the defaults, {got} in the full render - the duplicate is visible")
+            print(f"  {name}: {got} entries in the full render, as the values asked")
     if failures:
         print("FAIL")
         for f in failures:
