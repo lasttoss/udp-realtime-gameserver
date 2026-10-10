@@ -58,19 +58,9 @@ tick budget used (p95) : 53.88%
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  C[Game client] -->|POST /v1/auth| G[HTTP gateway]
-  G -->|HMAC signed ticket, ttl 10 min| C
-  C -->|UDP HELLO ticket| R[UDP relay]
-  R -->|WELCOME room, spawn, tick rate| C
-  C -->|UDP INPUT seq,x,y at 30 Hz| R
-  R -->|SNAPSHOT tick, ackSeq, players| C
-  V[Canvas viewer<br/>GET /v1/rooms/:id/state] --> G
-  L[botswarm<br/>1000 simulated clients] -->|auth + udp| G
-  L --> R
-  G --> M[/metrics, /v1/stats/]
-```
+![Input from a thousand simulated clients reaches the gateway, the relay simulates on a 30 Hz tick and broadcasts snapshots, and a viewer reads room state over HTTP](docs/figures/tick-roundtrip.png)
+
+**Figure 1.** One tick, end to end — a 30 Hz UDP game server
 
 ## Protocol
 
@@ -303,21 +293,34 @@ docs/kubernetes.md     why the chart looks like this, and what is missing for pr
 - **A dropped snapshot is not retransmitted.** The next tick is 33 ms away, which is cheaper than
   the round trip to ask for it again.
 
+## Repository standard
+
+Six items, applied where they mean something rather than everywhere. The exclusions are the point of
+the table: an item that cannot be honest in a repository of this kind is left out and said so.
+
+| Item | Here |
+|---|---|
+| `docker-compose.yml` | ✓ `docker-compose.yml` |
+| `Dockerfile` | ✓ `Dockerfile` |
+| Helm chart | ✓ `deploy/helm/udp-relay/` - not under `charts/`, which is why the path is worth naming |
+| Diagram | ✓ `docs/figures/tick-roundtrip.html` plus the exported PNG the README embeds |
+| Tests, run in CI | ✓ Start the relay container, Smoke test over HTTP and UDP, A short load test, Logs |
+| CI + `Makefile` | ✓ `.github/workflows/ci.yml` and `Makefile` |
+
 ## License
 
 MIT - see [LICENSE](LICENSE). No third-party dependencies: this is the Go standard library.
 
 ## One tick, end to end
 
-The Mermaid block above is the wiring. `docs/diagrams/tick-roundtrip.html` is the same path drawn to
+The figure above is the wiring. `docs/figures/tick-roundtrip.html` is the same path drawn to
 explain the two things a UDP server cannot avoid — a packet that never arrives, and a client that has
 already moved past it — with the measured percentiles of a real run on the same picture: 449,868 snapshots
 at 30.0 per client per second, rtt p50/p99 of 108 µs and 17.4 ms, and a tick loop spending 19.7 ms of its
 33.3 ms budget at the 99th percentile.
 
-Both sources are in the repository — self-contained HTML with inline SVG, and
-`docs/diagrams/tick-roundtrip.mmd` for the places that render Markdown — because a source can be reviewed
-and diffed, and the PNG is a build artifact:
+The source is in the repository too, as self-contained HTML with inline SVG, because a source can be
+reviewed and diffed and the PNG is a build artifact:
 
 ```bash
 make diagram   # exports a PNG using a local chromium, if there is one
