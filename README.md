@@ -177,6 +177,8 @@ rollout deadlock in [`docs/kubernetes.md`](docs/kubernetes.md) was found. The re
 choice, and what is still missing before this belongs on the public internet, is in
 [`docs/kubernetes.md`](docs/kubernetes.md).
 
+The CPU cost of a relay, and the kernel settings it depends on, are in [`docs/kernel-and-limits.md`](docs/kernel-and-limits.md).
+
 ## Configuration
 
 | environment | default | meaning |
