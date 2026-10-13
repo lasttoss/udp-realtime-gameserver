@@ -37,9 +37,9 @@ jobs:
       - name: Start the relay container
         run: docker compose up -d --build --wait --wait-timeout 240
       - name: Smoke test over HTTP and UDP
-        run: python3 scripts/smoke.py 127.0.0.1 8080 127.0.0.1 9000
+        run: make smoke  # the host ports live in the Makefile and .env.example, not in this file
       - name: A short load test
-        run: go run ./cmd/botswarm -gateway http://127.0.0.1:8080 -relay 127.0.0.1:9000 -ccu 100 -ramp 3s -duration 5s
+        run: make load CCU=100 RAMP=3s DURATION=5s  # the gateway port is read from .env, defaulting to the published one
       - name: Logs
         if: always()
         run: docker compose logs relay
