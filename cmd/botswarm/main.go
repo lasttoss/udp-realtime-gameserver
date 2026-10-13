@@ -44,7 +44,7 @@ type options struct {
 
 func main() {
 	var opt options
-	flag.StringVar(&opt.gateway, "gateway", "http://127.0.0.1:8080", "gateway base url (mints the tickets)")
+	flag.StringVar(&opt.gateway, "gateway", "http://127.0.0.1:18090", "gateway base url (mints the tickets)")
 	flag.StringVar(&opt.relay, "relay", "", "relay udp address; empty means use the one the gateway reports")
 	flag.IntVar(&opt.ccu, "ccu", 100, "number of simulated players")
 	flag.DurationVar(&opt.ramp, "ramp", 5*time.Second, "time over which the players connect")

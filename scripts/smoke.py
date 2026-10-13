@@ -16,9 +16,9 @@ import urllib.request
 import uuid
 
 GW_HOST = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
-GW_PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8080
+GW_PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 18090
 RELAY_HOST = sys.argv[3] if len(sys.argv) > 3 else "127.0.0.1"
-RELAY_PORT = int(sys.argv[4]) if len(sys.argv) > 4 else 9000
+RELAY_PORT = int(sys.argv[4]) if len(sys.argv) > 4 else 19000
 GW = f"http://{GW_HOST}:{GW_PORT}"
 
 KIND_HELLO, KIND_INPUT, KIND_PING = 1, 2, 3

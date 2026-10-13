@@ -18,7 +18,8 @@ run: ## Run the relay locally (UDP :9000, HTTP :8080)
 	$(GO) run ./cmd/relay
 
 load: ## Load test a running relay: make load CCU=500 DURATION=60s
-	$(GO) run ./cmd/botswarm -ccu $(CCU) -ramp $(RAMP) -duration $(DURATION)
+	@PORT=$$(grep -E '^HTTP_PORT=' .env 2>/dev/null | cut -d= -f2); \
+	$(GO) run ./cmd/botswarm -gateway http://127.0.0.1:$${PORT:-18090} -ccu $(CCU) -ramp $(RAMP) -duration $(DURATION)
 
 test: ## Unit tests
 	$(GO) test ./...
@@ -50,7 +51,7 @@ logs: ## Tail the container log
 smoke: ## End-to-end smoke test against a running relay
 	@PORT=$$(grep -E '^HTTP_PORT=' .env 2>/dev/null | cut -d= -f2); \
 	UDP=$$(grep -E '^RELAY_PORT=' .env 2>/dev/null | cut -d= -f2); \
-	python3 scripts/smoke.py 127.0.0.1 $${PORT:-8080} 127.0.0.1 $${UDP:-9000}
+	python3 scripts/smoke.py 127.0.0.1 $${PORT:-18090} 127.0.0.1 $${UDP:-19000}
 
 clean: ## Remove build output
 	rm -rf bin coverage.out

@@ -9,7 +9,7 @@ It ships with a **canvas viewer** and a **bot swarm** load generator, both of wh
 numbers below were produced.
 
 ```bash
-$ make run            # relay on udp :9000, gateway + viewer on http :8080
+$ make run            # relay on udp :9000, gateway + viewer on http :8080 (in the process)
 $ make load CCU=1000  # 1000 simulated clients, 30 inputs/s each
 ```
 
@@ -110,7 +110,7 @@ git clone https://github.com/lasttoss/udp-realtime-gameserver.git
 cd udp-realtime-gameserver
 
 make run                       # or: go run ./cmd/relay
-open http://localhost:8080    # the canvas viewer
+open http://localhost:18090    # the canvas viewer (the container publishes 18090 on loopback)
 make load CCU=100 DURATION=15s # in another terminal
 ```
 
@@ -127,7 +127,7 @@ Ports taken? `make run` honours `RELAY_ADDR`, `HTTP_ADDR` and `RELAY_ADVERTISE`;
 Try it by hand - the whole client is twenty lines:
 
 ```bash
-curl -s localhost:8080/v1/auth -H 'Content-Type: application/json' \
+curl -s localhost:18090/v1/auth -H 'Content-Type: application/json' \
   -d '{"player_id":"me","region":"sea"}' | tee /tmp/auth.json
 # then send a HELLO carrying the token and watch the snapshots come back
 python3 - <<'PY'
