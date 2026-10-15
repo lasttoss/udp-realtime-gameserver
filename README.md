@@ -32,6 +32,10 @@ clamped inputs         : 0 (server authority)
 tick budget used (p95) : 53.88%
 ```
 
+![the relay's own viewer page during a load run: a room of ten players rendered from the authoritative server state, with a live table of their positions, idle time and clamped inputs](docs/demo.gif)
+
+*The relay's viewer page while `bin/botswarm -ccu 250` was attached - one of 25 rooms of ten players. Positions on the page come from the relay, not from the clients. The frame timing is the recording's.*
+
 **Where to look first:** [`internal/relay/relay.go`](internal/relay/relay.go) is the 30 Hz loop and the ghost
 handling, [`internal/protocol/protocol.go`](internal/protocol/protocol.go) the wire format, and
 [`internal/protocol/token.go`](internal/protocol/token.go) the signed join ticket. Then `make run` and
