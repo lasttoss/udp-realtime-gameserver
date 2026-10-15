@@ -32,6 +32,11 @@ clamped inputs         : 0 (server authority)
 tick budget used (p95) : 53.88%
 ```
 
+**Where to look first:** [`internal/relay/relay.go`](internal/relay/relay.go) is the 30 Hz loop and the ghost
+handling, [`internal/protocol/protocol.go`](internal/protocol/protocol.go) the wire format, and
+[`internal/protocol/token.go`](internal/protocol/token.go) the signed join ticket. Then `make run` and
+`make load CCU=1000` reproduce the numbers above.
+
 ## What this demonstrates
 
 - **Server authority over movement, not over trust.** Clients send `INPUT{seq, x, y}`; the relay
