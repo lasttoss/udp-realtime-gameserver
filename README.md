@@ -1,5 +1,7 @@
 # udp-realtime-gameserver
 
+[![ci](https://github.com/lasttoss/udp-realtime-gameserver/actions/workflows/ci.yml/badge.svg)](https://github.com/lasttoss/udp-realtime-gameserver/actions/workflows/ci.yml)
+
 A **30 Hz UDP realtime game server in Go**, with the parts that are easy to get wrong handled on
 purpose: the server owns player movement, players join with an HMAC signed ticket, silent players
 are kept as ghosts instead of popping out of the world, and a room nobody is playing in is
